@@ -1,191 +1,178 @@
-# 基于HBase的网站日志数据分析系统
+# HBase Actual Data Analysis System
   
-## 系统说明
+## instructions
 
-### 1. 数据库设计
+### 1. Database design
 
-#### LogData
+####LogData
 
-- 该表用于存储经数据清洗、转化后的数据
-- 数据库类型： HBase
-- 表结构
+- This table is used to store the data after data cleaning and transformation
+- Database type: HBase
+- Table Structure
 
- Rowkey|         prop              |
- ----|:---------------------------:|
- |	rowkey  | IP	/ BYTES / URL / DATES / METHOD / FYDM / BYTES|
-- RowKey 结构设计说明
->  RowKey 分为 日期 + 网站代码后三位 + 六位数ID  
->  各部分说明如下：   
+  Rowkey|prop|
+  ----|:------------------------------:|
+  | rowkey | IP / BYTES / URL / DATES / METHOD / FYDM / BYTES|
+- RowKey structure design description
+> RowKey is divided into date + last three digits of website code + six digit ID
+> Each part is described as follows:
 
- 字段 |  解释 | 例子
+  Field | Explanation | Example
 ----| ----- |----
-日期 |日志文件的产生日期(纯数字，不含空格和-) | 20170808
-公司代码| 公司代码后三位 |200
-ID | 从100000开始的六位数字，用于唯一的标明数据并对齐 | 100001 
-> 完整例子  
-> 201708082001000000 表示代号为200点公司在2017-08-08产生的一次请求
-	 
-- 建表语句
+Date |The date when the log file was generated (pure numbers, without spaces and -) | 20170808
+Company code | The last three digits of the company code |200
+ID | Six digits starting from 100000, used to uniquely mark data and align | 100001
+> complete example
+> 201708082001000000 means a request made by 200-point company on 2017-08-08
+
+- Create table statement
 > create "LogData", "prop"
 
 -
 
 #### LogAna
-- 该表用于存储分析之后的数据
-- 数据库类型： HBase
-- 表结构 
+- This table is used to store the analyzed data
+- Database type: HBase
+- Table Structure 
 
-	RowKey | IP | URL | BYTES | MTHOD_STATE |REQ
-	-------|----|-----|-------|-------------|---
-	rowkey |IPSumVal  IPTotalNum  IPList |URLList  MaxURL | BytesSecList  BytesHourList /  TotalBytes  | MethodList StateList | ReqHourList ReqSecList ReqSum
-- 字段说明
+RowKey | IP | URL | BYTES | MTHOD_STATE |REQ
+-------|----|-----|-------|-------------|---
+rowkey |IPSumVal IPTotalNum IPList |URLList MaxURL | BytesSecList BytesHourList / TotalBytes | MethodList StateList | ReqHourList ReqSecList ReqSum
+- field description
 
-	字段 |  解释 | 例子
-	 ----| ----- |----
-	 IPTotalNum| IP总数，不包含重复的 | 100 表示当天有100个IP访问网站
-	 IPSumVal | IP总数，包含重复 | 100表示有100个IP访问网站，IP可重复
-	 IPList | IP和对应访问量的排行，结构为 由mutable.Map[String, Int]转变来的JSON文件| {"190.1.1.1"： 1000}  表示190.1.1.1的IP共在网站产生1000次请求）
-	 URLList | 被请求次数最多的10个URL，结构为Json | {"test.aj":100, "test2.aj":90, ...}
-	 MaxURL | 请求次数最多的URL(现在前端已经放弃使用这字段) |{"test.aj": 100}
-	 BytesSecList | 统计每秒内产生的流量，单位为Byte,但是前端展示时转化为MB | {"2017-08-08 01:00:00":9000， "2017-08-08 01:00:00": 500, ...}
-	 BytesHourList | 统计一天内每小时内产生的流量，单位为Byte,但是前端展示时转化为MB | {"08":9000， "09": 500, ...}， 08 表示 8点到9点内产生的流量
-	 TotalBytes | 一天内产生的总流量大小,单位为Byte,但是前端展示时转化为MB | 3000, 表示当天产生 3000b bytes的流量
-	 MethodList | 出现过的请求方法统计 | {"POST":3446,"OPTIONS":5,"HEAD":4}
-	 StateList | 出现过的请求状态中级 | {"501":8,"302":801,"404":1,"200":14738,"400":2,"405":4}
-	 ReqHourList | 按小时统计请求次数 | {"15":2350,"09":3503,"00":690,"11":1903}
-	 ReqSecList | 按秒统计请求次数 | {"2017-08-08 10:44:08":1,"2017-08-08 09:45:05":4,"2017-08-08 10:06:58":4}
-	 ReqSum | 一天内总请求次数 | 1000，表示当天内共有1000次请求
-	 
-- RowKey 结构设计说明
->  RowKey 分为 日期 + 公司代码后三位
->  各部分说明如下：   
+Field | Explanation | Example
+----| ----- |----
+IPTotalNum| The total number of IPs, excluding duplicates | 100 means that 100 IPs visited the website that day
+IPSumVal | Total number of IPs, including duplicates | 100 indicates that 100 IPs visit the website, and IPs can be repeated
+IPList | Ranking of IP and corresponding visits, the structure is a JSON file converted from mutable.Map[String, Int] | {"190.1.1.1": 1000} means that the IP of 190.1.1.1 generated 1000 requests on the website in total)
+URLList | The 10 most requested URLs, the structure is Json | {"test.aj":100, "test2.aj":90, ...}
+MaxURL | The URL with the most requests (now the front end has given up using this field) |{"test.aj": 100}
+BytesSecList | Statistical traffic generated per second, the unit is Byte, but converted to MB when the front-end display | {"2017-08-08 01:00:00":9000, "2017-08-08 01:00:00" : 500, ...}
+BytesHourList | Count the traffic generated every hour in a day, the unit is Byte, but it will be converted to MB when displayed on the front end | {"08": 9000, "09": 500, ...}, 08 means within 8 o'clock to 9 o'clock generated traffic
+TotalBytes | The total traffic size generated in one day, the unit is Byte, but it is converted to MB when displayed on the front end | 3000, indicating that the traffic of 3000b bytes is generated on that day
+MethodList | Appeared request method statistics | {"POST":3446,"OPTIONS":5,"HEAD":4}
+StateList | Appeared request state intermediate | {"501":8,"302":801,"404":1,"200":14738,"400":2,"405":4}
+ReqHourList | Count the number of requests by hour | {"15":2350,"09":3503,"00":690,"11":1903}
+ReqSecList | Count the number of requests by second | {"2017-08-08 10:44:08":1,"2017-08-08 09:45:05":4,"2017-08-08 10:06:58 ":4}
+ReqSum | The total number of requests in a day | 1000, indicating that there are 1000 requests in the day
 
-		字段 |  解释 | 例子
-		 ----| ----- |----
-	 	日期 |日志文件的产生日期(纯数字，不含空格和-) | 20170808
-	 	公司代码| 公司代码后三位 |200， 需要注意的是000表示当天所有网站数据
-	 
-	> example:
-	20170808200 表示天津高院在2017-08-08的所有数据
-	20170808000 表示所有法院在2017-08-08点所有数据
-	 
-- 建表语句  
+- RowKey structure design description
+> RowKey is divided into date + last three digits of company code
+> Each part is described as follows:
+
+Field | Explanation | Example
+----| ----- |----
+Date |The date when the log file was generated (pure numbers, without spaces and -) | 20170808
+Company code | The last three digits of the company code | 200, it should be noted that 000 means all website data of the day
+
+> example:
+20170808200 means all the data of Tianjin High Court on 2017-08-08
+20170808000 means all courts at point 2017-08-08 all data
+
+- Create table statement
 > create "LogAna", "IP", "URL", "BYTES", "METHOD_STATE", "REQ"
 
 
-### 2. 项目代码描述
-- 本项目分为三个子项目， 包括数据采集、数据存储和展示、数据离线分析   
+### 2. Project code description
+- This project is divided into three sub-projects, including data acquisition, data storage and display, and data offline analysis
 
-#### 数据采集
+#### data collection
 
-- 工程名：CollectTomcatLogs
-- 功能说明：   
+- Project name: CollectTomcatLogs
+- Function Description:   
 
-	> 收集指定路径下的tomcat日志  
-	> 重命名文件之后上传到HDFS或FTP服务器   
-	> 保存日志，记录是否上传成功
+> Collect tomcat logs under the specified path
+> Upload to HDFS or FTP server after renaming the file
+> Save the log to record whether the upload is successful
  
-- 部署说明： 部署在各个需要采集日志的服务器上，在 my.properties 里指定公司代码和日志路径
-- 配置管理： maven
-- 主要技术： Java FTPClient, HDFS
-- 测试用例说明： 主要用于测试重命名后的文件是否正常
-- 文件重命名： 在localhost_XXXXX.txt文件前加上法院代码，以此来区分各公司数据
+- Deployment instructions: Deploy on each server that needs to collect logs, specify the company code and log path in my.properties
+- Configuration management: maven
+- Main technologies: Java FTPClient, HDFS
+- Test case description: mainly used to test whether the renamed file is normal
+- File renaming: Add the court code before the localhost_XXXXX.txt file to distinguish the data of each company
 
-#### 数据存储和展示
-- 工程名： RestoreData
-- 功能说明：
+#### Data storage and display
+- Project name: RestoreData
+- Function Description:
 
-	> 数据预处理： 包括数据解析、清洗和转化  
-	> 数据存储： 将转化后的数据保存在一个List中，批量插入HBase数据库  
-	> 前端展示：展示分析得到的数据  
-	> 数据查询： 根据各种输入条件查询对应的数据
-- 开发环境： 
-	> JDK 8   
-	> Hadoop 2.7   
-	> Hbase 1.2
-	> tomcat 8   
-- 部署说明:在 my.properties 里配置好各项数据,注意JDK、Hadoop的版本兼容
-- 配置管理： maven
-- 主要技术：Spring MVC / Hadoop / JSP
-- 测试用例说明：
-	> HbaseBatchInsertTest.java: 用于测试批量插入  
-	> HbaseConnectionTest.java: 用于测试Hbase连接是否正常  
-	> ParseLogTest.java: 用于测试日志解析  
-	> ListBean.java: 打印所有的bean，用于应付@Autowried失败的情况  
-- 前端部分：  
-	>####代码部分
-	> index.jsp： 默认加载页面，加载完成后会请求数据，展示前一天所有网站数据  
-	> index.js： 用于处理index.jsp中的各种请求和数据解析
-	
-	> ---------- 
-	> queryData.jsp: 用于查询各家网站数据，输入为日期 + 网站，支持多选  
-	> queryData.js: 用于处理queryData.jsp中的各种请求和数据解析（待完成）
-	
-	> ---------
-	> dataGrid.jsp: 以表格的形式展示数据（待完成）
-	
-	> --------
-	> myCharts.js: 使用echarts绘制各种图表(注意dom的初始化在外部完成）  
-	> inputCheck.js: 检查输入是否合法
-	
-	>---------
-	> mystyle.css: 定制各类样式
-	>####第三方库
-	> Bootstrap: 主要是用其格栅系统  
-	> Bootstrap-select: 多选框的实现  
-	> BootstrapDatepickr: 日期输入  
-	> echarts: 绘制各类图表  
-	> jQuery: 框架  
-	> font-awesome: 各类小图标
+> Data preprocessing: including data analysis, cleaning and transformation
+> Data storage: save the converted data in a List and insert them into the HBase database in batches
+> Front-end display: display the analyzed data
+> Data query: Query corresponding data according to various input conditions
+- Development environment:
+> JDK 8
+> Hadoop 2.7
+> Hbase 1.2
+> tomcat 8
+- Deployment instructions: Configure various data in my.properties, pay attention to the compatibility of JDK and Hadoop versions
+- Configuration management: maven
+- Main technology: Spring MVC / Hadoop / JSP
+- Test case description:
+> HbaseBatchInsertTest.java: for testing batch insertion
+> HbaseConnectionTest.java: used to test whether the Hbase connection is normal
+> ParseLogTest.java: for testing log parsing
+> ListBean.java: Print all beans, used to cope with @Autowried failure
+- Front end part:
+> #### code section
+> index.jsp: The page is loaded by default, and the data will be requested after loading, showing all the website data of the previous day
+> index.js: used to process various requests and data analysis in index.jsp
 
-	
-#### 数据离线分析
+> ----------
+> queryData.jsp: Used to query the data of various websites, the input is date + website, multiple selection is supported
+> queryData.js: used to process various requests and data analysis in queryData.jsp (to be completed)
 
-- 工程名： ScalaReadAndWrite
-- 功能说明：
+> ---------
+> dataGrid.jsp: display data in form of table (to be completed)
 
-	> 离线分析各类数据，共13个指标，详情见数据库表 LogAna 设计
-	
-- 开发环境：
-	> Scala 2.11  
-	> Spark 1.52  
-	> Hadoop 2.7  
-- 特别说明：
-	> spark 中全局变量只有两种实现方式，广播变量或累加器，本项目使用累加器  
-	> 自定义的累加器的时候非常一定要注意输入输出类型一定要正确
-	> 一定要实现全部六个重载函数  
-	> 一个累加器只能传递一种变量，这个变量可以是复杂的对象  
-	> 不这样做的话累加器会失效！
-- 部署说明：暂无
-- 配置管理：maven
-- 主要技术：Spark
-- 项目结构说明：
-	> Accumulator:累加器，包含各种自定义的累加器  
-	> analysis: 主要分析代码
-	> DAO: 解析实体类，并存入到HBase  
-	> Entity： 两个实体类  
-	> util: 各种工具类
-	
-	#### 3. 项目截图：
-	
-	- Hbase数据库截图  
-	![image](https://github.com/Maicius/WebLogsAnalysisSystem/blob/master/image/p2.png)
-	  
-	- 数据展示界面  
-	![image](https://github.com/Maicius/WebLogsAnalysisSystem/blob/master/image/p1.png)  
-	
-	- 数据展示界面  
-	![image](https://github.com/Maicius/WebLogsAnalysisSystem/blob/master/image/p3.png)
+> --------
+> myCharts.js: Use echarts to draw various charts (note that the initialization of dom is done externally)
+> inputCheck.js: Check if the input is legal
 
-	
+>---------
+> mystyle.css: Customize various styles
+>####Third party library
+> Bootstrap: mainly with its grid system
+> Bootstrap-select: Implementation of multiple selection boxes
+> BootstrapDatepickr: date input
+> echarts: draw various charts
+> jQuery: frame
+> font-awesome: various small icons
 
 
-	
-	
+#### Data offline analysis
 
+- Project name: ScalaReadAndWrite
+- Function Description:
 
-	 
+> Offline analysis of various data, a total of 13 indicators, see the database table LogAna design for details
 
- 
- 
- 
+- Development environment:
+> Scala 2.11
+> Spark 1.52
+> Hadoop 2.7
+- Special Note:
+> There are only two implementations of global variables in spark, broadcast variables or accumulators, this project uses accumulators
+> When customizing the accumulator, it is very important to pay attention to the correct input and output types
+> Be sure to implement all six overloaded functions
+> An accumulator can only pass one kind of variable, which can be a complex object
+> Failure to do so will invalidate the accumulator!
+- Deployment instructions: None
+- Configuration management: maven
+- Main technology: Spark
+- Description of project structure:
+> Accumulator: accumulator, including various custom accumulators
+> analysis: main analysis code
+> DAO: parse the entity class and store it in HBase
+> Entity: two entity classes
+> util: various tools
+
+#### 3. Project screenshot:
+
+- Hbase database screenshot
+![image](https://github.com/LoveNui/WebLogs-Analysis-System/blob/master/image/p2.png)
+
+- Data display interface
+![image](https://github.com/LoveNui/WebLogs-Analysis-System/blob/master/image/p1.png)
+
+- Data display interface
+![image](https://github.com/LoveNui/WebLogs-Analysis-System/blob/master/image/p3.png)
